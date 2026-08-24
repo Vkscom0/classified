@@ -215,19 +215,27 @@
 
   // Full Post Details Popup Show Karne Ka Function
 // 1. Unique ID se Post Dhoondhne Aur Modal Kholne Ka Function
-function openPostDetails(identifier, updateUrl = true) {
+function openPostDetails(element) {
     if (!rawPosts || rawPosts.length === 0) return;
 
-    // Index ki jagah Unique ID ya ProductName se dhoondhein
-    let p = rawPosts.find(item => String(item.id) === String(identifier) || item.ProductName === identifier);
-    
-    // Safety check: Agar fir bhi numeric index aaye
-    if (!p && typeof identifier === 'number') {
-        p = rawPosts[identifier];
+    let p;
+
+    // Agar element pass hua hai (Click karne par)
+    if (element && element.getAttribute) {
+        const id = element.getAttribute('data-id');
+        const title = decodeURIComponent(element.getAttribute('data-title') || '');
+        
+        p = rawPosts.find(item => String(item.id) === String(id) || item.ProductName === title) || rawPosts[id];
+    } 
+    // Agar direct ID / String pass huyi hai (URL Link se kholne par)
+    else if (typeof element === 'string' || typeof element === 'number') {
+        const searchTerm = decodeURIComponent(String(element));
+        p = rawPosts.find(item => String(item.id) === searchTerm || item.ProductName === searchTerm) || rawPosts[element];
     }
 
     if (!p) return;
 
+    // --- Aapka Baaki Ka Code Niche Waise Hi Rahega ---
     let rawPhone = String(p.Phone || '').replace(/[^0-9]/g, '');
     let waPhone = rawPhone.length === 10 ? '91' + rawPhone : rawPhone;
 
@@ -253,22 +261,22 @@ function openPostDetails(identifier, updateUrl = true) {
 
     document.getElementById('viewPostModal').style.display = 'flex';
 
-    // 🔗 Address bar me Direct Link URL update karein
+    // URL Address bar update
     const postId = p.id || encodeURIComponent(p.ProductName);
-    if (updateUrl) {
-        window.history.pushState({ postId: postId }, '', `?post=${postId}`);
-    }
+    window.history.pushState({ postId: postId }, '', `?post=${postId}`);
 
-    // Activity Logging
-    if (typeof postToSheet === 'function') {
-        postToSheet({
-          action: 'logActivity',
-          userEmail: typeof currentUser !== 'undefined' ? currentUser : 'Guest',
-          activity: 'Viewed Post: ' + (p.ProductName || 'Unknown')
-        });
+    try {
+        if (typeof postToSheet === 'function') {
+            postToSheet({
+              action: 'logActivity',
+              userEmail: typeof currentUser !== 'undefined' ? currentUser : 'Guest',
+              activity: 'Viewed Post: ' + (p.ProductName || 'Unknown')
+            });
+        }
+    } catch(e) {
+        console.log("Logging skipped:", e);
     }
 }
-
 // 🔗 Address bar se link paste karke kholne ke liye ye auto-run function add karein:
 function checkUrlAndOpenPost() {
     const urlParams = new URLSearchParams(window.location.search);
