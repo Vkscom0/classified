@@ -24,7 +24,6 @@
 
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
     
-    /* Clickable Card Styling */
     .card { background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; flex-direction: column; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
     .card:hover { transform: translateY(-4px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
     .card img { width: 100%; height: 160px; object-fit: cover; background: #eee; }
@@ -40,12 +39,10 @@
     .btn-msg { background: #17a2b8; }
     .btn-wa { background: #25d366; }
 
-    /* Modal Popups */
     .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 100; padding: 15px; }
     .modal-content { background: #fff; width: 100%; max-width: 500px; padding: 20px; border-radius: 8px; max-height: 90vh; overflow-y: auto; }
-    .modal-content input, .modal-content textarea { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
+    .modal-content input, .modal-content textarea, .modal-content select { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
     
-    /* Post Details Popup Styling */
     .post-detail-img { width: 100%; max-height: 250px; object-fit: cover; border-radius: 6px; margin-bottom: 15px; }
     .detail-row { margin-bottom: 10px; font-size: 14px; color: #333; }
     .detail-row b { color: #1a252f; }
@@ -97,7 +94,7 @@
       <input type="text" id="cName" placeholder="Company Name" required>
       <input type="text" id="cat" placeholder="Category" required>
       <input type="url" id="imgUrl" placeholder="Image URL (https://...)" required>
-      <input type="text" id="phone" placeholder="Phone Number" required>
+      <input type="tel" id="phone" placeholder="Phone Number" required>
       <input type="email" id="email" placeholder="Contact Email" required>
       <input type="url" id="web" placeholder="Website URL">
       <textarea id="addr" placeholder="Full Address" rows="2"></textarea>
@@ -125,11 +122,22 @@
   let currentUser = localStorage.getItem('userEmail') || null;
   let searchTimer = null;
 
+  // Helper: XSS Protection Function
+  function escapeHTML(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
   function updateAuthUI() {
     const navContainer = document.getElementById('authNavContainer');
     if (currentUser) {
       navContainer.innerHTML = `
-        <span style="font-size:14px; font-weight:600;">👤 ${currentUser}</span>
+        <span style="font-size:14px; font-weight:600;">👤 ${escapeHTML(currentUser)}</span>
         <button class="btn-logout" onclick="handleLogout()">Logout</button>
       `;
     } else {
@@ -144,7 +152,6 @@
     for (const key in data) { params.append(key, data[key]); }
     return fetch(API_URL, {
       method: 'POST',
-      mode: 'no-cors',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params.toString()
     });
@@ -157,12 +164,13 @@
       const data = await res.json();
 
       if (data.error) {
-        statusDiv.innerText = "Error: " + data.error;
+        if(statusDiv) statusDiv.innerText = "Error: " + data.error;
         return;
       }
 
-      rawPosts = data.map(item => {
-        let clean = {};
+      // Har Post Ko Uska Unique ID Diya Gaya Hai Fix Ke Liye
+      rawPosts = data.map((item, id) => {
+        let clean = { _id: id };
         for (let key in item) { clean[key.trim()] = item[key]; }
         return clean;
       });
@@ -171,7 +179,7 @@
       filterAndSort();
     } catch (err) {
       console.error(err);
-      statusDiv.innerText = "Failed to load data. Check API URL or Sheet Permissions.";
+      if(statusDiv) statusDiv.innerText = "Failed to load data. Check API URL or Sheet Permissions.";
     }
   }
 
@@ -179,7 +187,7 @@
     const categories = [...new Set(rawPosts.map(p => p.Category).filter(Boolean))];
     const select = document.getElementById('categoryFilter');
     select.innerHTML = '<option value="">All Categories</option>';
-    categories.forEach(c => select.innerHTML += `<option value="${c}">${c}</option>`);
+    categories.forEach(c => select.innerHTML += `<option value="${escapeHTML(c)}">${escapeHTML(c)}</option>`);
   }
 
   function renderPosts(posts) {
@@ -191,16 +199,16 @@
       return;
     }
 
-    posts.forEach((p, index) => {
+    posts.forEach((p) => {
       const phone = String(p.Phone || '').replace(/[^0-9]/g, '');
       container.innerHTML += `
-      <div class="card" onclick="openPostDetails(${index})">
-          <img src="${p.Image || 'https://via.placeholder.com/300x160'}" onerror="this.src='https://via.placeholder.com/300x160?text=No+Image'">
+        <div class="card" onclick="openPostDetails(${p._id})">
+          <img src="${escapeHTML(p.Image) || 'https://via.placeholder.com/300x160'}" onerror="this.src='https://via.placeholder.com/300x160?text=No+Image'">
           <div class="card-body">
-            <span class="badge">${p.Category || 'General'}</span>
-            <div class="title">${p.ProductName}</div>
-            <div class="company">${p.CompanyName || ''}</div>
-            ${p.Address ? `<div class="info"><b>Address:</b> ${p.Address}</div>` : ''}
+            <span class="badge">${escapeHTML(p.Category) || 'General'}</span>
+            <div class="title">${escapeHTML(p.ProductName)}</div>
+            <div class="company">${escapeHTML(p.CompanyName) || ''}</div>
+            ${p.Address ? `<div class="info"><b>Address:</b> ${escapeHTML(p.Address)}</div>` : ''}
             
             <div class="actions" onclick="event.stopPropagation();">
               <a href="tel:${phone}" class="btn-action btn-call">Call</a>
@@ -213,106 +221,41 @@
     });
   }
 
-  // Full Post Details Popup Show Karne Ka Function
-// 1. Unique ID se Post Dhoondhne Aur Modal Kholne Ka Function
-function openPostDetails(element) {
-    if (!rawPosts || rawPosts.length === 0) return;
-
-    let p;
-
-    // Agar element pass hua hai (Click karne par)
-    if (element && element.getAttribute) {
-        const id = element.getAttribute('data-id');
-        const title = decodeURIComponent(element.getAttribute('data-title') || '');
-        
-        p = rawPosts.find(item => String(item.id) === String(id) || item.ProductName === title) || rawPosts[id];
-    } 
-    // Agar direct ID / String pass huyi hai (URL Link se kholne par)
-    else if (typeof element === 'string' || typeof element === 'number') {
-        const searchTerm = decodeURIComponent(String(element));
-        p = rawPosts.find(item => String(item.id) === searchTerm || item.ProductName === searchTerm) || rawPosts[element];
-    }
-
+  function openPostDetails(originalId) {
+    const p = rawPosts.find(item => item._id === originalId);
     if (!p) return;
 
-    // --- Aapka Baaki Ka Code Niche Waise Hi Rahega ---
-    let rawPhone = String(p.Phone || '').replace(/[^0-9]/g, '');
-    let waPhone = rawPhone.length === 10 ? '91' + rawPhone : rawPhone;
-
+    const phone = String(p.Phone || '').replace(/[^0-9]/g, '');
     const detailBody = document.getElementById('postDetailBody');
 
     detailBody.innerHTML = `
-      <img src="${p.Image || 'https://via.placeholder.com/300x160'}" class="post-detail-img" onerror="this.src='https://via.placeholder.com/300x160?text=No+Image'">
-      <span class="badge" style="margin-bottom:8px;">${p.Category || 'General'}</span>
-      <h2 style="margin-bottom:5px;">${p.ProductName || 'No Title'}</h2>
-      <h4 style="color:#666; margin-bottom:15px;">${p.CompanyName || ''}</h4>
+      <img src="${escapeHTML(p.Image) || 'https://via.placeholder.com/300x160'}" class="post-detail-img" onerror="this.src='https://via.placeholder.com/300x160?text=No+Image'">
+      <span class="badge" style="margin-bottom:8px;">${escapeHTML(p.Category) || 'General'}</span>
+      <h2 style="margin-bottom:5px;">${escapeHTML(p.ProductName)}</h2>
+      <h4 style="color:#666; margin-bottom:15px;">${escapeHTML(p.CompanyName) || ''}</h4>
       
-      <div class="detail-row"><b>Phone:</b> ${p.Phone || 'N/A'}</div>
-      <div class="detail-row"><b>Email:</b> ${p.Email || 'N/A'}</div>
-      ${p.Website ? `<div class="detail-row"><b>Website:</b> <a href="${p.Website}" target="_blank">${p.Website}</a></div>` : ''}
-      ${p.Address ? `<div class="detail-row"><b>Address:</b> ${p.Address}</div>` : ''}
+      <div class="detail-row"><b>Phone:</b> ${escapeHTML(p.Phone) || 'N/A'}</div>
+      <div class="detail-row"><b>Email:</b> ${escapeHTML(p.Email) || 'N/A'}</div>
+      ${p.Website ? `<div class="detail-row"><b>Website:</b> <a href="${escapeHTML(p.Website)}" target="_blank">${escapeHTML(p.Website)}</a></div>` : ''}
+      ${p.Address ? `<div class="detail-row"><b>Address:</b> ${escapeHTML(p.Address)}</div>` : ''}
       
-      <div class="actions" style="margin-top:20px; display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px;">
-        <a href="tel:${rawPhone}" class="btn-action btn-call" style="padding:10px;">Call</a>
-        <a href="sms:${rawPhone}" class="btn-action btn-msg" style="padding:10px;">SMS</a>
-        <a href="https://wa.me/${waPhone}" target="_blank" class="btn-action btn-wa" style="padding:10px;">WhatsApp</a>
+      <div class="actions" style="margin-top:20px; grid-template-columns: 1fr 1fr 1fr;">
+        <a href="tel:${phone}" class="btn-action btn-call" style="padding:10px;">Call</a>
+        <a href="sms:${phone}" class="btn-action btn-msg" style="padding:10px;">SMS</a>
+        <a href="https://wa.me/${phone}" target="_blank" class="btn-action btn-wa" style="padding:10px;">WhatsApp</a>
       </div>
     `;
 
     document.getElementById('viewPostModal').style.display = 'flex';
 
-    // URL Address bar update
-    const postId = p.id || encodeURIComponent(p.ProductName);
-    window.history.pushState({ postId: postId }, '', `?post=${postId}`);
+    postToSheet({
+      action: 'logActivity',
+      userEmail: currentUser || 'Guest',
+      activity: 'Viewed Post: ' + p.ProductName
+    });
+  }
 
-    try {
-        if (typeof postToSheet === 'function') {
-            postToSheet({
-              action: 'logActivity',
-              userEmail: typeof currentUser !== 'undefined' ? currentUser : 'Guest',
-              activity: 'Viewed Post: ' + (p.ProductName || 'Unknown')
-            });
-        }
-    } catch(e) {
-        console.log("Logging skipped:", e);
-    }
-}
-// 🔗 Address bar se link paste karke kholne ke liye ye auto-run function add karein:
-function checkUrlAndOpenPost() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const postId = urlParams.get('post');
-    if (postId) {
-        openPostDetails(postId, false);
-    }
-}    // Activity Logging
-    if (typeof postToSheet === 'function') {
-        postToSheet({
-          action: 'logActivity',
-          userEmail: typeof currentUser !== 'undefined' ? currentUser : 'Guest',
-          activity: 'Viewed Post: ' + (p.ProductName || 'Unknown')
-        });
-    }
-}
-
-// 2. Modal Close Function (URL ko normal restore karne ke liye)
-function closePostDetails() {
-    document.getElementById('viewPostModal').style.display = 'none';
-    // Address bar se ?post=... hata kar normal URL kar do
-    window.history.pushState({}, '', window.location.pathname);
-}
-
-// 3. Direct URL Link Se Post Kholne Ka System (Auto-run)
-function checkUrlAndOpenPost() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const postId = urlParams.get('post');
-    
-    if (postId) {
-        openPostDetails(postId, false); // URL change nahi karega, sirf post kholega
-    }
-}
-
-// Jab bhi Posts Load Ho jayein tab ye call karein:
-// (Aap apne loadPosts ya sheet fetch ke baad `checkUrlAndOpenPost()` zaroor call karein)function filterAndSort() {
+  function filterAndSort() {
     const search = document.getElementById('searchInput').value.toLowerCase();
     const cat = document.getElementById('categoryFilter').value;
     const sort = document.getElementById('sortOrder').value;
