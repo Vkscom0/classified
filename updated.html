@@ -194,7 +194,7 @@
     posts.forEach((p, index) => {
       const phone = String(p.Phone || '').replace(/[^0-9]/g, '');
       container.innerHTML += `
-        <div class="card" onclick="openPostDetails('${p.id || p.ProductName}')">
+       <div class="card" onclick="openPostDetails(this)" data-id="${p.id || index}" data-title="${encodeURIComponent(p.ProductName || '')}">
           <img src="${p.Image || 'https://via.placeholder.com/300x160'}" onerror="this.src='https://via.placeholder.com/300x160?text=No+Image'">
           <div class="card-body">
             <span class="badge">${p.Category || 'General'}</span>
