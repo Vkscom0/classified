@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Power Directory Portal</title>
+  <style>
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 0; }
+    body { background: #f4f6f8; color: #333; padding: 20px; }
+    .container { max-width: 1000px; margin: 0 auto; }
+    
+    .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+    .header-bar h2 { font-size: 24px; color: #1a252f; }
+    .auth-status-container { display: flex; align-items: center; gap: 10px; }
+    
+    .filter-bar { display: flex; gap: 10px; flex-wrap: wrap; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    .filter-bar input, .filter-bar select, .filter-bar button { padding: 10px; border: 1px solid #ccc; border-radius: 6px; flex: 1; min-width: 150px; font-size: 14px; }
+    
+    .btn-main { background: #0066cc; color: #fff; border: none; cursor: pointer; font-weight: bold; padding: 10px 16px; border-radius: 6px; transition: background 0.2s; }
+    .btn-main:hover { background: #0052a3; }
+    .btn-auth { background: #0066cc; color: white; border: none; cursor: pointer; font-weight: bold; padding: 12px 16px; border-radius: 6px; width: 100%; font-size: 15px; margin-top: 10px; transition: background 0.2s; }
+    .btn-auth:hover { background: #0052a3; }
+    .btn-logout { background: #dc3545; color: white; border: none; cursor: pointer; font-weight: bold; padding: 10px 16px; border-radius: 6px; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+    
+    .card { background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; flex-direction: column; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+    .card:hover { transform: translateY(-4px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    .card img { width: 100%; height: 160px; object-fit: cover; background: #eee; }
+    .card-body { padding: 15px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+    .badge { background: #e6f0ff; color: #0066cc; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; width: fit-content; }
+    .title { font-size: 18px; font-weight: bold; }
+    .company { color: #666; font-size: 14px; }
+    .info { font-size: 12px; color: #444; margin-top: 5px; word-break: break-all; }
+
+    .actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: auto; padding-top: 10px; }
+    .btn-action { text-align: center; text-decoration: none; padding: 8px 4px; border-radius: 4px; font-size: 12px; font-weight: bold; color: #fff; }
+    .btn-call { background: #28a745; }
+    .btn-msg { background: #17a2b8; }
+    .btn-wa { background: #25d366; }
+
+    /* Modal Styling */
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 100; padding: 15px; backdrop-filter: blur(3px); }
+    .modal-content { background: #fff; width: 100%; max-width: 420px; padding: 25px; border-radius: 12px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2); position: relative; }
+    
+    /* Modern Auth Tabs */
+    .auth-tabs { display: flex; border-bottom: 2px solid #eef2f5; margin-bottom: 20px; }
+    .auth-tab { flex: 1; text-align: center; padding: 10px; cursor: pointer; font-weight: 600; color: #777; transition: all 0.3s; }
+    .auth-tab.active { color: #0066cc; border-bottom: 3px solid #0066cc; }
+
+    /* Modern Form Controls */
+    .form-group { margin-bottom: 15px; position: relative; }
+    .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; color: #444; }
+    .form-control { width: 100%; padding: 12px 14px; border: 1.5px solid #e1e5eb; border-radius: 8px; font-size: 14px; transition: border-color 0.2s, box-shadow 0.2s; outline: none; }
+    .form-control:focus { border-color: #0066cc; box-shadow: 0 0 0 3px rgba(0,102,204,0.1); }
+    
+    .btn-close-modal { position: absolute; top: 15px; right: 15px; background: transparent; border: none; font-size: 20px; cursor: pointer; color: #aaa; }
+    .btn-close-modal:hover { color: #333; }
+
+    .post-detail-img { width: 100%; max-height: 250px; object-fit: cover; border-radius: 6px; margin-bottom: 15px; }
+    .detail-row { margin-bottom: 10px; font-size: 14px; color: #333; }
+    .detail-row b { color: #1a252f; }
+    
+    #statusMessage { text-align: center; padding: 20px; font-weight: bold; color: #666; grid-column: 1/-1; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header-bar">
+    <h2>Power Directory Portal</h2>
+    <div class="auth-status-container" id="authNavContainer"></div>
+  </div>
+  
+  <div class="filter-bar">
+    <input type="text" id="searchInput" placeholder="Real-time Search..." oninput="handleSearch()">
+    <select id="categoryFilter" onchange="filterAndSort()">
+      <option value="">All Categories</option>
+    </select>
+    <select id="sortOrder" onchange="filterAndSort()">
+      <option value="A-Z">Sort: A to Z</option>
+      <option value="Z-A">Sort: Z to A</option>
+    </select>
+    <button class="btn-main" onclick="openPostModal()">+ Post Ad</button>
+  </div>
+
+  <div class="grid" id="postsContainer">
+    <div id="statusMessage">Data loading... Please wait.</div>
+  </div>
+</div>
+
+<!-- Modal 1: Login / Signup & Post Submission -->
+<div class="modal" id="appModal">
+  <div class="modal-content">
+    <button class="btn-close-modal" onclick="closeModal('appModal')">✕</button>
+
+    <!-- Auth Section -->
+    <div id="authBox">
+      <div class="auth-tabs">
+        <div class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Login</div>
+        <div class="auth-tab" id="tabRegister" onclick="switchAuthTab('register')">Register</div>
+      </div>
+
+      <div class="form-group" id="nameGroup" style="display: none;">
+        <label>Full Name</label>
+        <input type="text" id="userName" class="form-control" placeholder="Enter your full name">
+      </div>
+
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" id="userEmail" class="form-control" placeholder="name@example.com" required>
+      </div>
+
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="userPass" class="form-control" placeholder="••••••••" required>
+      </div>
+
+      <button class="btn-auth" id="authBtn" onclick="handleAuthSubmit()">Login</button>
+    </div>
+
+    <!-- Post Submission Form -->
+    <form id="submissionForm" onsubmit="submitPost(event)" style="display:none;">
+      <h3 style="margin-bottom: 15px; color: #1a252f;">Submit New Ad</h3>
+      
+      <div class="form-group">
+        <label>Product Name</label>
+        <input type="text" id="pName" class="form-control" placeholder="e.g. Solar Panel 500W" required>
+      </div>
+
+      <div class="form-group">
+        <label>Company Name</label>
+        <input type="text" id="cName" class="form-control" placeholder="e.g. Power Solutions Ltd" required>
+      </div>
+
+      <div class="form-group">
+        <label>Category</label>
+        <input type="text" id="cat" class="form-control" placeholder="e.g. Inverter, Battery, Solar" required>
+      </div>
+
+      <div class="form-group">
+        <label>Image URL</label>
+        <input type="url" id="imgUrl" class="form-control" placeholder="https://example.com/image.jpg" required>
+      </div>
+
+      <div class="form-group">
+        <label>Phone Number</label>
+        <input type="tel" id="phone" class="form-control" placeholder="+91 9876543210" required>
+      </div>
+
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="email" class="form-control" placeholder="contact@company.com" required>
+      </div>
+
+      <div class="form-group">
+        <label>Website URL (Optional)</label>
+        <input type="url" id="web" class="form-control" placeholder="https://company.com">
+      </div>
+
+      <div class="form-group">
+        <label>Full Address</label>
+        <textarea id="addr" class="form-control" placeholder="City, State, Country" rows="2"></textarea>
+      </div>
+
+      <button type="submit" class="btn-main" id="subBtn" style="width:100%; padding:12px; font-size:15px;">Submit Post</button>
+    </form>
+  </div>
+</div>
+
+<!-- Modal 2: Full Post Details Preview -->
+<div class="modal" id="viewPostModal">
+  <div class="modal-content">
+    <button class="btn-close-modal" onclick="closeModal('viewPostModal')">✕</button>
+    <div id="postDetailBody"></div>
+  </div>
+</div>
+
+<script>
+  const API_URL = "https://script.google.com/macros/s/AKfycbwta6Y8zsD9oNUfNVA3PO0fYIUhBGFYVVd1lmwDCpz_yhm3fxkY-ErRAYuP-qNuyGR1/exec";
+
+  let rawPosts = [];
+  let currentUser = localStorage.getItem('userEmail') || null;
+  let searchTimer = null;
+  let authMode = 'login';
+
+  function escapeHTML(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function switchAuthTab(mode) {
+    authMode = mode;
+    const tabLogin = document.getElementById('tabLogin');
+    const tabRegister = document.getElementById('tabRegister');
+    const nameGroup = document.getElementById('nameGroup');
+    const authBtn = document.getElementById('authBtn');
+
+    if (mode === 'register') {
+      tabRegister.classList.add('active');
+      tabLogin.classList.remove('active');
+      nameGroup.style.display = 'block';
+      authBtn.innerText = 'Create Account';
+    } else {
+      tabLogin.classList.add('active');
+      tabRegister.classList.remove('active');
+      nameGroup.style.display = 'none';
+      authBtn.innerText = 'Login';
+    }
+  }
+
+  function updateAuthUI() {
+    const navContainer = document.getElementById('authNavContainer');
+    if (currentUser) {
+      navContainer.innerHTML = `
+        <span style="font-size:14px; font-weight:600;">👤 ${escapeHTML(currentUser)}</span>
+        <button class="btn-logout" onclick="handleLogout()">Logout</button>
+      `;
+    } else {
+      navContainer.innerHTML = `
+        <button class="btn-auth" style="margin:0; width:auto; padding:10px 16px;" onclick="openAuthModal()">Login / Signup</button>
+      `;
+    }
+  }
+
+  function postToSheet(data) {
+    const params = new URLSearchParams();
+    for (const key in data) { params.append(key, data[key]); }
+    return fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
+    });
+  }
+
+  async function fetchPosts() {
+    const statusDiv = document.getElementById('statusMessage');
+    try {
+      const res = await fetch(API_URL);
+      const data = await res.json();
+
+      if (data.error) {
+        if(statusDiv) statusDiv.innerText = "Error: " + data.error;
+        return;
+      }
+
+      rawPosts = data.map((item, id) => {
+        let clean = { _id: id };
+        for (let key in item) { clean[key.trim()] = item[key]; }
+        return clean;
+      });
+
+      populateCategories();
+      filterAndSort();
+      checkUrlHash();
+    } catch (err) {
+      console.error(err);
+      if(statusDiv) statusDiv.innerText = "Failed to load data. Check API URL or Sheet Permissions.";
+    }
+  }
+
+  function populateCategories() {
+    const categories = [...new Set(rawPosts.map(p => p.Category).filter(Boolean))];
+    const select = document.getElementById('categoryFilter');
+    select.innerHTML = '<option value="">All Categories</option>';
+    categories.forEach(c => select.innerHTML += `<option value="${escapeHTML(c)}">${escapeHTML(c)}</option>`);
+  }
+
+  function renderPosts(posts) {
+    const container = document.getElementById('postsContainer');
+    container.innerHTML = '';
+
+    if (posts.length === 0) {
+      container.innerHTML = '<div id="statusMessage">No approved posts found.</div>';
+      return;
+    }
+
+    posts.forEach((p) => {
+      const phone = String(p.Phone || '').replace(/[^0-9]/g, '');
+      container.innerHTML += `
+        <div class="card" onclick="openPostDetails(${p._id})">
+          <img src="${escapeHTML(p.Image) || 'https://via.placeholder.com/300x160'}" onerror="this.src='https://via.placeholder.com/300x160?text=No+Image'">
+          <div class="card-body">
+            <span class="badge">${escapeHTML(p.Category) || 'General'}</span>
+            <div class="title">${escapeHTML(p.ProductName)}</div>
+            <div class="company">${escapeHTML(p.CompanyName) || ''}</div>
+            ${p.Address ? `<div class="info"><b>Address:</b> ${escapeHTML(p.Address)}</div>` : ''}
+            
+            <div class="actions" onclick="event.stopPropagation();">
+              <a href="tel:${phone}" class="btn-action btn-call">Call</a>
+              <a href="sms:${phone}" class="btn-action btn-msg">SMS</a>
+              <a href="https://wa.me/${phone}" target="_blank" class="btn-action btn-wa">WhatsApp</a>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  function openPostDetails(originalId, updateHash = true) {
+    const p = rawPosts.find(item => item._id === originalId);
+    if (!p) return;
+
+    if (updateHash) {
+      window.location.hash = `post-${originalId}`;
+    }
+
+    const phone = String(p.Phone || '').replace(/[^0-9]/g, '');
+    const detailBody = document.getElementById('postDetailBody');
+
+    detailBody.innerHTML = `
+      <img src="${escapeHTML(p.Image) || 'https://via.placeholder.com/300x160'}" class="post-detail-img" onerror="this.src='https://via.placeholder.com/300x160?text=No+Image'">
+      <span class="badge" style="margin-bottom:8px;">${escapeHTML(p.Category) || 'General'}</span>
+      <h2 style="margin-bottom:5px;">${escapeHTML(p.ProductName)}</h2>
+      <h4 style="color:#666; margin-bottom:15px;">${escapeHTML(p.CompanyName) || ''}</h4>
+      
+      <div class="detail-row"><b>Phone:</b> ${escapeHTML(p.Phone) || 'N/A'}</div>
+      <div class="detail-row"><b>Email:</b> ${escapeHTML(p.Email) || 'N/A'}</div>
+      ${p.Website ? `<div class="detail-row"><b>Website:</b> <a href="${escapeHTML(p.Website)}" target="_blank">${escapeHTML(p.Website)}</a></div>` : ''}
+      ${p.Address ? `<div class="detail-row"><b>Address:</b> ${escapeHTML(p.Address)}</div>` : ''}
+      
+      <div class="actions" style="margin-top:20px; grid-template-columns: 1fr 1fr 1fr;">
+        <a href="tel:${phone}" class="btn-action btn-call" style="padding:10px;">Call</a>
+        <a href="sms:${phone}" class="btn-action btn-msg" style="padding:10px;">SMS</a>
+        <a href="https://wa.me/${phone}" target="_blank" class="btn-action btn-wa" style="padding:10px;">WhatsApp</a>
+      </div>
+    `;
+
+    document.getElementById('viewPostModal').style.display = 'flex';
+
+    postToSheet({
+      action: 'logActivity',
+      userEmail: currentUser || 'Guest',
+      activity: 'Viewed Post: ' + p.ProductName
+    });
+  }
+
+  function checkUrlHash() {
+    const hash = window.location.hash;
+    if (hash && hash.startsWith('#post-')) {
+      const postId = parseInt(hash.replace('#post-', ''), 10);
+      if (!isNaN(postId)) {
+        openPostDetails(postId, false);
+      }
+    }
+  }
+
+  function openAuthModal() {
+    switchAuthTab('login');
+    document.getElementById('authBox').style.display = 'block';
+    document.getElementById('submissionForm').style.display = 'none';
+    document.getElementById('appModal').style.display = 'flex';
+  }
+
+  function openPostModal() {
+    if (!currentUser) {
+      alert("Post submit karne ke liye pehle Login / Signup karein.");
+      openAuthModal();
+      return;
+    }
+    document.getElementById('authBox').style.display = 'none';
+    document.getElementById('submissionForm').style.display = 'block';
+    document.getElementById('appModal').style.display = 'flex';
+  }
+
+  function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+    if (modalId === 'viewPostModal') {
+      history.pushState("", document.title, window.location.pathname + window.location.search);
+    }
+  }
+
+  function filterAndSort() {
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    const cat = document.getElementById('categoryFilter').value;
+    const sort = document.getElementById('sortOrder').value;
+
+    let filtered = rawPosts.filter(p => {
+      const matchSearch = (p.ProductName || '').toLowerCase().includes(search) || 
+                          (p.CompanyName || '').toLowerCase().includes(search);
+      const matchCat = cat === "" || p.Category === cat;
+      return matchSearch && matchCat;
+    });
+
+    filtered.sort((a, b) => {
+      const nameA = (a.ProductName || '').toLowerCase();
+      const nameB = (b.ProductName || '').toLowerCase();
+      return sort === 'A-Z' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+    });
+
+    renderPosts(filtered);
+  }
+
+  function handleSearch() {
+    filterAndSort();
+    const query = document.getElementById('searchInput').value.trim();
+    clearTimeout(searchTimer);
+    if (query.length > 2) {
+      searchTimer = setTimeout(() => {
+        postToSheet({
+          action: 'logActivity',
+          userEmail: currentUser || 'Guest',
+          activity: 'Search: ' + query
+        });
+      }, 1000);
+    }
+  }
+
+  async function handleAuthSubmit() {
+    const email = document.getElementById('userEmail').value;
+    const pass = document.getElementById('userPass').value;
+    const name = document.getElementById('userName').value;
+
+    if (!email || !pass || (authMode === 'register' && !name)) {
+      alert("Kripya sabhi zaroori jankari bharein.");
+      return;
+    }
+
+    const btn = document.getElementById('authBtn');
+    btn.disabled = true;
+    btn.innerText = authMode === 'register' ? "Creating Account..." : "Logging in...";
+
+    currentUser = email;
+    localStorage.setItem('userEmail', email);
+
+    try {
+      await postToSheet({ 
+        action: authMode === 'register' ? 'register' : 'login', 
+        email: email, 
+        password: pass, 
+        name: name 
+      });
+      updateAuthUI();
+      closeModal('appModal');
+      alert(authMode === 'register' ? "Registration successful!" : "Login successful!");
+    } catch(err) {
+      alert("Authentication error.");
+    } finally {
+      btn.disabled = false;
+      btn.innerText = authMode === 'register' ? "Create Account" : "Login";
+    }
+  }
+
+  function handleLogout() {
+    currentUser = null;
+    localStorage.removeItem('userEmail');
+    updateAuthUI();
+    alert("Logged out successfully.");
+  }
+
+  async function submitPost(e) {
+    e.preventDefault();
+    const btn = document.getElementById('subBtn');
+    btn.disabled = true;
+    btn.innerText = "Submitting...";
+
+    try {
+      await postToSheet({
+        action: 'addPost',
+        productName: document.getElementById('pName').value,
+        companyName: document.getElementById('cName').value,
+        category: document.getElementById('cat').value,
+        image: document.getElementById('imgUrl').value,
+        phone: document.getElementById('phone').value,
+        email: document.getElementById('email').value,
+        website: document.getElementById('web').value,
+        address: document.getElementById('addr').value
+      });
+
+      alert('Post submitted for Admin Approval!');
+      document.getElementById('submissionForm').reset();
+      closeModal('appModal');
+    } catch (err) {
+      alert('Submission failed.');
+    } finally {
+      btn.disabled = false;
+      btn.innerText = "Submit Post";
+    }
+  }
+
+  window.addEventListener('hashchange', checkUrlHash);
+
+  updateAuthUI();
+  fetchPosts();
+</script>
+</body>
+</html>
