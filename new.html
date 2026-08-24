@@ -24,7 +24,6 @@
 
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
     
-    /* Clickable Card Styling */
     .card { background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; flex-direction: column; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
     .card:hover { transform: translateY(-4px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
     .card img { width: 100%; height: 160px; object-fit: cover; background: #eee; }
@@ -40,12 +39,10 @@
     .btn-msg { background: #17a2b8; }
     .btn-wa { background: #25d366; }
 
-    /* Modal Popups */
     .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 100; padding: 15px; }
     .modal-content { background: #fff; width: 100%; max-width: 500px; padding: 20px; border-radius: 8px; max-height: 90vh; overflow-y: auto; }
-    .modal-content input, .modal-content textarea { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
+    .modal-content input, .modal-content textarea, .modal-content select { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
     
-    /* Post Details Popup Styling */
     .post-detail-img { width: 100%; max-height: 250px; object-fit: cover; border-radius: 6px; margin-bottom: 15px; }
     .detail-row { margin-bottom: 10px; font-size: 14px; color: #333; }
     .detail-row b { color: #1a252f; }
@@ -83,7 +80,6 @@
   <div class="modal-content">
     <h3 id="modalTitle" style="margin-bottom:15px;">Login / Register</h3>
     
-    <!-- Auth Section -->
     <div id="authBox">
       <input type="text" id="userName" placeholder="Your Name (For Signup)">
       <input type="email" id="userEmail" placeholder="Enter Your Email" required>
@@ -91,13 +87,12 @@
       <button class="btn-auth" id="authBtn" style="width:100%; padding:10px;" onclick="handleLogin()">Login / Register</button>
     </div>
 
-    <!-- Post Form -->
     <form id="submissionForm" onsubmit="submitPost(event)" style="display:none;">
       <input type="text" id="pName" placeholder="Product Name" required>
       <input type="text" id="cName" placeholder="Company Name" required>
       <input type="text" id="cat" placeholder="Category" required>
       <input type="url" id="imgUrl" placeholder="Image URL (https://...)" required>
-      <input type="text" id="phone" placeholder="Phone Number" required>
+      <input type="tel" id="phone" placeholder="Phone Number" required>
       <input type="email" id="email" placeholder="Contact Email" required>
       <input type="url" id="web" placeholder="Website URL">
       <textarea id="addr" placeholder="Full Address" rows="2"></textarea>
@@ -112,7 +107,7 @@
 <div class="modal" id="viewPostModal">
   <div class="modal-content">
     <div id="postDetailBody">
-      <!-- Full Details Will Be Rendered Here -->
+      <!-- Details Render Here -->
     </div>
     <button onclick="closeModal('viewPostModal')" style="width:100%; margin-top:15px; padding:10px; background:#6c757d; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Close Preview</button>
   </div>
@@ -125,11 +120,21 @@
   let currentUser = localStorage.getItem('userEmail') || null;
   let searchTimer = null;
 
+  function escapeHTML(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
   function updateAuthUI() {
     const navContainer = document.getElementById('authNavContainer');
     if (currentUser) {
       navContainer.innerHTML = `
-        <span style="font-size:14px; font-weight:600;">👤 ${currentUser}</span>
+        <span style="font-size:14px; font-weight:600;">👤 ${escapeHTML(currentUser)}</span>
         <button class="btn-logout" onclick="handleLogout()">Logout</button>
       `;
     } else {
@@ -144,7 +149,6 @@
     for (const key in data) { params.append(key, data[key]); }
     return fetch(API_URL, {
       method: 'POST',
-      mode: 'no-cors',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params.toString()
     });
@@ -157,21 +161,24 @@
       const data = await res.json();
 
       if (data.error) {
-        statusDiv.innerText = "Error: " + data.error;
+        if(statusDiv) statusDiv.innerText = "Error: " + data.error;
         return;
       }
 
-      rawPosts = data.map(item => {
-        let clean = {};
+      rawPosts = data.map((item, id) => {
+        let clean = { _id: id };
         for (let key in item) { clean[key.trim()] = item[key]; }
         return clean;
       });
 
       populateCategories();
       filterAndSort();
+      
+      // डेटा लोड होते ही URL का Hash चेक करेगा
+      checkUrlHash();
     } catch (err) {
       console.error(err);
-      statusDiv.innerText = "Failed to load data. Check API URL or Sheet Permissions.";
+      if(statusDiv) statusDiv.innerText = "Failed to load data. Check API URL or Sheet Permissions.";
     }
   }
 
@@ -179,7 +186,7 @@
     const categories = [...new Set(rawPosts.map(p => p.Category).filter(Boolean))];
     const select = document.getElementById('categoryFilter');
     select.innerHTML = '<option value="">All Categories</option>';
-    categories.forEach(c => select.innerHTML += `<option value="${c}">${c}</option>`);
+    categories.forEach(c => select.innerHTML += `<option value="${escapeHTML(c)}">${escapeHTML(c)}</option>`);
   }
 
   function renderPosts(posts) {
@@ -191,16 +198,16 @@
       return;
     }
 
-    posts.forEach((p, index) => {
+    posts.forEach((p) => {
       const phone = String(p.Phone || '').replace(/[^0-9]/g, '');
       container.innerHTML += `
-        <div class="card" onclick="openPostDetails(${index})">
-          <img src="${p.Image || 'https://via.placeholder.com/300x160'}" onerror="this.src='https://via.placeholder.com/300x160?text=No+Image'">
+        <div class="card" onclick="openPostDetails(${p._id})">
+          <img src="${escapeHTML(p.Image) || 'https://via.placeholder.com/300x160'}" onerror="this.src='https://via.placeholder.com/300x160?text=No+Image'">
           <div class="card-body">
-            <span class="badge">${p.Category || 'General'}</span>
-            <div class="title">${p.ProductName}</div>
-            <div class="company">${p.CompanyName || ''}</div>
-            ${p.Address ? `<div class="info"><b>Address:</b> ${p.Address}</div>` : ''}
+            <span class="badge">${escapeHTML(p.Category) || 'General'}</span>
+            <div class="title">${escapeHTML(p.ProductName)}</div>
+            <div class="company">${escapeHTML(p.CompanyName) || ''}</div>
+            ${p.Address ? `<div class="info"><b>Address:</b> ${escapeHTML(p.Address)}</div>` : ''}
             
             <div class="actions" onclick="event.stopPropagation();">
               <a href="tel:${phone}" class="btn-action btn-call">Call</a>
@@ -213,24 +220,28 @@
     });
   }
 
-  // Full Post Details Popup Show Karne Ka Function
-  function openPostDetails(index) {
-    const p = rawPosts[index];
-    if(!p) return;
+  // Post Detail खोलना और Address Bar URL बदलना
+  function openPostDetails(originalId, updateHash = true) {
+    const p = rawPosts.find(item => item._id === originalId);
+    if (!p) return;
+
+    if (updateHash) {
+      window.location.hash = `post-${originalId}`;
+    }
 
     const phone = String(p.Phone || '').replace(/[^0-9]/g, '');
     const detailBody = document.getElementById('postDetailBody');
 
     detailBody.innerHTML = `
-      <img src="${p.Image || 'https://via.placeholder.com/300x160'}" class="post-detail-img" onerror="this.src='https://via.placeholder.com/300x160?text=No+Image'">
-      <span class="badge" style="margin-bottom:8px;">${p.Category || 'General'}</span>
-      <h2 style="margin-bottom:5px;">${p.ProductName}</h2>
-      <h4 style="color:#666; margin-bottom:15px;">${p.CompanyName || ''}</h4>
+      <img src="${escapeHTML(p.Image) || 'https://via.placeholder.com/300x160'}" class="post-detail-img" onerror="this.src='https://via.placeholder.com/300x160?text=No+Image'">
+      <span class="badge" style="margin-bottom:8px;">${escapeHTML(p.Category) || 'General'}</span>
+      <h2 style="margin-bottom:5px;">${escapeHTML(p.ProductName)}</h2>
+      <h4 style="color:#666; margin-bottom:15px;">${escapeHTML(p.CompanyName) || ''}</h4>
       
-      <div class="detail-row"><b>Phone:</b> ${p.Phone || 'N/A'}</div>
-      <div class="detail-row"><b>Email:</b> ${p.Email || 'N/A'}</div>
-      ${p.Website ? `<div class="detail-row"><b>Website:</b> <a href="${p.Website}" target="_blank">${p.Website}</a></div>` : ''}
-      ${p.Address ? `<div class="detail-row"><b>Address:</b> ${p.Address}</div>` : ''}
+      <div class="detail-row"><b>Phone:</b> ${escapeHTML(p.Phone) || 'N/A'}</div>
+      <div class="detail-row"><b>Email:</b> ${escapeHTML(p.Email) || 'N/A'}</div>
+      ${p.Website ? `<div class="detail-row"><b>Website:</b> <a href="${escapeHTML(p.Website)}" target="_blank">${escapeHTML(p.Website)}</a></div>` : ''}
+      ${p.Address ? `<div class="detail-row"><b>Address:</b> ${escapeHTML(p.Address)}</div>` : ''}
       
       <div class="actions" style="margin-top:20px; grid-template-columns: 1fr 1fr 1fr;">
         <a href="tel:${phone}" class="btn-action btn-call" style="padding:10px;">Call</a>
@@ -241,12 +252,29 @@
 
     document.getElementById('viewPostModal').style.display = 'flex';
 
-    // Activity logging on full post view
     postToSheet({
       action: 'logActivity',
       userEmail: currentUser || 'Guest',
       activity: 'Viewed Post: ' + p.ProductName
     });
+  }
+
+  // URL Hash पढ़कर ऑटोमेटिक पोस्ट खोलना
+  function checkUrlHash() {
+    const hash = window.location.hash;
+    if (hash && hash.startsWith('#post-')) {
+      const postId = parseInt(hash.replace('#post-', ''), 10);
+      if (!isNaN(postId)) {
+        openPostDetails(postId, false);
+      }
+    }
+  }
+
+  function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+    if (modalId === 'viewPostModal') {
+      history.pushState("", document.title, window.location.pathname + window.location.search);
+    }
   }
 
   function filterAndSort() {
@@ -302,10 +330,6 @@
     document.getElementById('authBox').style.display = 'none';
     document.getElementById('submissionForm').style.display = 'block';
     document.getElementById('appModal').style.display = 'flex';
-  }
-
-  function closeModal(modalId) {
-    document.getElementById(modalId).style.display = 'none';
   }
 
   async function handleLogin() {
@@ -374,6 +398,9 @@
       btn.innerText = "Submit Post";
     }
   }
+
+  // अगर यूजर ब्राउज़र में Hash बदले या Back Button दबाए
+  window.addEventListener('hashchange', checkUrlHash);
 
   updateAuthUI();
   fetchPosts();
