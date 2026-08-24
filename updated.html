@@ -194,7 +194,7 @@
     posts.forEach((p, index) => {
       const phone = String(p.Phone || '').replace(/[^0-9]/g, '');
       container.innerHTML += `
-        <div class="card" onclick="openPostDetails(${index})">
+        <div class="card" onclick="openPostDetails('${p.id || p.ProductName}')">
           <img src="${p.Image || 'https://via.placeholder.com/300x160'}" onerror="this.src='https://via.placeholder.com/300x160?text=No+Image'">
           <div class="card-body">
             <span class="badge">${p.Category || 'General'}</span>
@@ -214,13 +214,22 @@
   }
 
   // Full Post Details Popup Show Karne Ka Function
-function openPostDetails(postId) {
-    // Index ki jagah unique ID ya find ka use karein
-    const p = rawPosts.find(item => item.id === postId || item.ProductName === postId) || rawPosts[postId];
+// 1. Unique ID se Post Dhoondhne Aur Modal Kholne Ka Function
+function openPostDetails(identifier, updateUrl = true) {
+    if (!rawPosts || rawPosts.length === 0) return;
+
+    // Index ki jagah Unique ID ya ProductName se dhoondhein
+    let p = rawPosts.find(item => String(item.id) === String(identifier) || item.ProductName === identifier);
+    
+    // Safety check: Agar fir bhi numeric index aaye
+    if (!p && typeof identifier === 'number') {
+        p = rawPosts[identifier];
+    }
+
     if (!p) return;
 
     let rawPhone = String(p.Phone || '').replace(/[^0-9]/g, '');
-    let waPhone = rawPhone.length === 10 ? '91' + rawPhone : rawPhone; // WhatsApp country code fix
+    let waPhone = rawPhone.length === 10 ? '91' + rawPhone : rawPhone;
 
     const detailBody = document.getElementById('postDetailBody');
 
@@ -244,13 +253,58 @@ function openPostDetails(postId) {
 
     document.getElementById('viewPostModal').style.display = 'flex';
 
-    postToSheet({
-      action: 'logActivity',
-      userEmail: typeof currentUser !== 'undefined' ? currentUser : 'Guest',
-      activity: 'Viewed Post: ' + (p.ProductName || 'Unknown')
-    });
+    // 🔗 Address bar me Direct Link URL update karein
+    const postId = p.id || encodeURIComponent(p.ProductName);
+    if (updateUrl) {
+        window.history.pushState({ postId: postId }, '', `?post=${postId}`);
+    }
+
+    // Activity Logging
+    if (typeof postToSheet === 'function') {
+        postToSheet({
+          action: 'logActivity',
+          userEmail: typeof currentUser !== 'undefined' ? currentUser : 'Guest',
+          activity: 'Viewed Post: ' + (p.ProductName || 'Unknown')
+        });
+    }
 }
-function filterAndSort() {
+
+// 🔗 Address bar se link paste karke kholne ke liye ye auto-run function add karein:
+function checkUrlAndOpenPost() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const postId = urlParams.get('post');
+    if (postId) {
+        openPostDetails(postId, false);
+    }
+}    // Activity Logging
+    if (typeof postToSheet === 'function') {
+        postToSheet({
+          action: 'logActivity',
+          userEmail: typeof currentUser !== 'undefined' ? currentUser : 'Guest',
+          activity: 'Viewed Post: ' + (p.ProductName || 'Unknown')
+        });
+    }
+}
+
+// 2. Modal Close Function (URL ko normal restore karne ke liye)
+function closePostDetails() {
+    document.getElementById('viewPostModal').style.display = 'none';
+    // Address bar se ?post=... hata kar normal URL kar do
+    window.history.pushState({}, '', window.location.pathname);
+}
+
+// 3. Direct URL Link Se Post Kholne Ka System (Auto-run)
+function checkUrlAndOpenPost() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const postId = urlParams.get('post');
+    
+    if (postId) {
+        openPostDetails(postId, false); // URL change nahi karega, sirf post kholega
+    }
+}
+
+// Jab bhi Posts Load Ho jayein tab ye call karein:
+// (Aap apne loadPosts ya sheet fetch ke baad `checkUrlAndOpenPost()` zaroor call karein)function filterAndSort() {
     const search = document.getElementById('searchInput').value.toLowerCase();
     const cat = document.getElementById('categoryFilter').value;
     const sort = document.getElementById('sortOrder').value;
